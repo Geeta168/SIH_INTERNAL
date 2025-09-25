@@ -13,9 +13,6 @@ function Profile() {
     bio: ""
   });
 
-  const [posts, setPosts] = useState([]);
-  const [newPost, setNewPost] = useState({ title: "", content: "", media: null });
-
   // -----------------------------
   // Fetch profile + posts
   // -----------------------------
@@ -46,20 +43,20 @@ function Profile() {
       }
     };
 
-    const fetchPosts = async () => {
-      try {
-        if (!id) return; // Only fetch posts for specific users
-        const res = await fetch(`http://localhost:3000/api/users/${id}/posts`);
-        const data = await res.json();
-        console.log("POSTS DATA:", data);
-        setPosts(data);
-      } catch (err) {
-        console.error("Error fetching posts:", err);
-      }
-    };
+    // const fetchPosts = async () => {
+    //   try {
+    //     if (!id) return; // Only fetch posts for specific users
+    //     const res = await fetch(`http://localhost:3000/api/users/${id}/posts`);
+    //     const data = await res.json();
+    //     console.log("POSTS DATA:", data);
+    //     setPosts(data);
+    //   } catch (err) {
+    //     console.error("Error fetching posts:", err);
+    //   }
+    // };
 
     fetchProfile();
-    fetchPosts();
+    // fetchPosts();
   }, [id]);
 
   // -----------------------------
@@ -106,42 +103,10 @@ function Profile() {
     }
   };
 
-  // -----------------------------
-  // Post handlers
-  // -----------------------------
-  const handlePostChange = (e) => {
-    if (e.target.name === "media") {
-      setNewPost({ ...newPost, media: e.target.files[0] });
-    } else {
-      setNewPost({ ...newPost, [e.target.name]: e.target.value });
-    }
-  };
+  
 
-  const handlePostSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (!id) return alert("You must view a user's profile to post");
+  
 
-      const formData = new FormData();
-      formData.append("title", newPost.title);
-      formData.append("content", newPost.content);
-      if (newPost.media) formData.append("media", newPost.media);
-
-      const res = await fetch(`http://localhost:3000/api/users/${id}/posts`, {
-        method: "POST",
-        body: formData,
-        credentials: "include"
-      });
-
-      const savedPost = await res.json();
-      console.log("NEW POST:", savedPost);
-
-      setPosts([savedPost, ...posts]);
-      setNewPost({ title: "", content: "", media: null });
-    } catch (err) {
-      console.error("Error creating post:", err);
-    }
-  };
 
   // -----------------------------
   // UI

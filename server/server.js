@@ -18,10 +18,6 @@ import authRouter from './routes/authRoutes.js';
 import userAuth from "./middleware/userAuth.js";
 import usersRouter from "./routes/users.js";
 
-
-
-
-
 const app=express();
 const port=3000;
 
