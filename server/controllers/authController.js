@@ -2,56 +2,74 @@ import bcrypt from "bcryptjs";  //used to hash password for security purpose
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
 import nodemailer from "../config/nodemailer.js";
+import { validationResult } from "express-validator";
 
 // async and is promise which is type of asyncronous function;
 // asyncronous means task we will execute after complete of brfore task only
 // syncronous means next task will executed even though before task is running
 
 export const register= async(req, res)=>{ 
-    
-    const {name,email,password}=req.body;
-
-    if(!name || !email || !password){
-        return res.json({success:false, message:'email or password is wrong'});
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            success: false,
+            message: 'Validation failed',
+            errors: errors.array()
+        });
     }
+    
+    const {name,username,email,password}=req.body;
 
     try {
+        // Check for existing email
+        const existingEmail = await userModel.findOne({email: email.toLowerCase()});
+        if(existingEmail){
+            return res.json({success:false, message:'Email already registered'});
+        }
 
-        const existingUser=await userModel.findOne({email});
-
-        if(existingUser){
-            return res.json({success:false, message:'user already exists'});
+        // Check for existing username
+        const existingUsername = await userModel.findOne({username: username.toLowerCase()});
+        if(existingUsername){
+            return res.json({success:false, message:'Username already taken'});
         }
         
         const hashedPassword=await bcrypt.hash(password,10);
 
-    const user=new userModel({name,email,password:hashedPassword});
+        const user=new userModel({
+            name: name || username, 
+            username: username.toLowerCase(), 
+            email: email.toLowerCase(), 
+            password:hashedPassword
+        });
 
-    await user.save();
+        await user.save();
 
-    const token= jwt.sign({id:user._id},process.env.JWT_SECRET, {expiresIn: '7d'});
+        const token= jwt.sign({id:user._id},process.env.JWT_SECRET, {expiresIn: '7d'});
 
-    res.cookie('token',token,{
-        httpOnly:true,
-        secure:process.env.NODE_ENV==='production',  //"development" → when running locally.
-                                                     //"production" → when deployed to a live server (Heroku, AWS, Vercel, etc.).
-        SameSite: (process.env.NODE_ENV==='production')? 'none':'strict',   //
-        maxAge: 7*24*60*60*1000,
+        res.cookie('token',token,{
+            httpOnly:true,
+            secure:process.env.NODE_ENV==='production',
+            sameSite: (process.env.NODE_ENV==='production')? 'none':'lax',
+            maxAge: 7*24*60*60*1000,
+        })
 
-    })
+        const mailOptions={
+            from:process.env.SENDER_EMAIL,
+            to:email,
+            subject:'Welcome to Our Platform',
+            text:`Hello ${name}\n${email},\n\nThank you for registering on our platform! We're excited to have you on board.\n\nBest regards,\nThe Team`
+        };
+        try {
+            if (process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.SENDER_EMAIL) {
+                await nodemailer.sendMail(mailOptions);
+            }
+        } catch (e) {
+            console.error('Email send failed (register):', e.message);
+            // do not block registration on email failure
+        }
 
-
-
-    const mailOptions={
-        from:process.env.SENDER_EMAIL,
-        to:email,
-        subject:'Welcome to Our Platform',
-        text:`Hello ${name}\n${email},\n\nThank you for registering on our platform! We're excited to have you on board.\n\nBest regards,\nThe Team`
-    };
-
-    await nodemailer.sendMail(mailOptions);
-
-     return res.json({success:true,message:'user registered successfully'});
+         return res.json({success:true,message:'user registered successfully'});
         
     } catch (error) {
        return res.json({success:false, message:error.message});
@@ -59,12 +77,17 @@ export const register= async(req, res)=>{
 }
 
 export const login=async(req,res)=>{
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            success: false,
+            message: 'Validation failed',
+            errors: errors.array()
+        });
+    }
       
     const{email,password}=req.body;
-
-    if(!email || !password){
-        return res.json({message:'email or password is wrong'});
-    }
 
 try {
     const user= await userModel.findOne({email});
@@ -79,17 +102,19 @@ try {
         return res.json({success:false,message:'email or passowrd is wrong'});
     }
 
+    // Update last login timestamp
+    await userModel.updateOne({_id: user._id}, {lastLoginAt: new Date()});
+
     const token=jwt.sign({id:user._id},process.env.JWT_SECRET,{expiresIn:'7d'});
 
      res.cookie('token',token,{
         httpOnly:true,
         secure:process.env.NODE_ENV==='production',
-         SameSite: (process.env.NODE_ENV==='production')? 'none':'strict',  
+        sameSite: (process.env.NODE_ENV==='production')? 'none':'lax',  
         maxAge: 7*24*60*60*1000,
-
     })
     
-    return res.json({success:true,});
+    return res.json({success:true});
 } catch (error) {
     return res.json({success:false, message:error.message});
     }
@@ -100,8 +125,8 @@ export const logout=async(req,res)=>{
     try {
         res.clearCookie('token',{
              httpOnly:true,
-        secure:process.env.NODE_ENV==='production',
-         SameSite: (process.env.NODE_ENV==='production')? 'none':'strick',  
+             secure:process.env.NODE_ENV==='production',
+             sameSite: (process.env.NODE_ENV==='production')? 'none':'lax',
         })
 
         return res.json({success:true, message:'user logged Out'})
@@ -114,7 +139,8 @@ export const logout=async(req,res)=>{
 
 export const sendVerifyOtp=async(req,res)=>{
     try{
-      const{userId}=req.body;
+      // prefer authenticated user id from middleware, fallback to body
+      const userId = req.userId || req.body.userId;
 
       const user=await userModel.findById(userId);
 
@@ -135,7 +161,14 @@ export const sendVerifyOtp=async(req,res)=>{
             subject:'Your Account Verification OTP',
             text:`Hello ${user.name},\n\nYour OTP for account verification is: ${otp}\nThis OTP is valid for 10 minutes.\n\nIf you did not request this, please ignore this email.\n\nBest regards,\nThe Team`
         };
-        await nodemailer.sendMail(mailOptions);
+        try {
+            if (process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.SENDER_EMAIL) {
+                await nodemailer.sendMail(mailOptions);
+            }
+        } catch (e) {
+            console.error('Email send failed (verify otp):', e.message);
+            // do not block OTP generation on email failure
+        }
 
         return res.json({success:true, message:'otp sent to your email'});
     
@@ -146,13 +179,17 @@ export const sendVerifyOtp=async(req,res)=>{
 }
 
 export const verifyAccount=async(req,res)=>{
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            success: false,
+            message: 'Validation failed',
+            errors: errors.array()
+        });
+    }
        
     const{userId,otp}=req.body;
-
-    if(!userId || !otp){
-        return register.json({success:false,message:'invalid requests'});
-
-    }
 
     try {
         const user=await userModel.findById(userId);
@@ -174,8 +211,18 @@ export const verifyAccount=async(req,res)=>{
 
         
 
-}catch(error){
-    return res.json({success:false,message:error.message})
+} catch (error) {
+    return res.json({success:false,message:error.message});
 }
+}
+
+export const me = async (req, res) => {
+    try {
+        const user = await userModel.findById(req.userId).select('name email isAccountVerified');
+        if (!user) return res.json({ success: false, message: 'User not found' });
+        return res.json({ success: true, user });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
 }
 

@@ -1,8 +1,10 @@
 import React from 'react'
+import { useI18n } from '../context/I18nContext'
 
 const Header = () => {
+  const { t } = useI18n()
   return (
-    <div className='bg-[#bbb089b3]'>
+    <div className='bg-gradient-to-b from-[#fef3c7] via-[#fff7ed] to-white'>
     
    {/*<img className="w-full sm:h-170 h-80" src="./public/p1.jpg" />*/}
 
@@ -10,15 +12,12 @@ const Header = () => {
   
   {/* Left side text */}
   <div className="w-full md:w-1/2 text-center md:text-left ml-30 mt-20">
-  <div className="bg-[#051732] text-white p-10 rounded-2xl shadow-xl">
+  <div className="bg-[#2a3b1f] text-white p-10 rounded-2xl shadow-xl border border-white/10">
     <h1 className="font-extrabold text-2xl md:text-5xl text-white drop-shadow-lg">
-      WELCOME TO <span className="text-[#285ca8]">SMART FARMING</span>
+      {t('header_title')}
     </h1>
-    <p className="pt-6 text-gray-300 md:text-lg leading-relaxed max-w-xl mx-auto md:mx-0">
-      Empowering farmers with <span className="font-semibold text-[#285ca8]">modern technology </span> 
-      to grow smarter, healthier, and more sustainable crops.  
-      From weather alerts to soil guidance, we’re here to make farming 
-      simpler and more productive for you.
+    <p className="pt-6 text-amber-100 md:text-lg leading-relaxed max-w-xl mx-auto md:mx-0">
+      {t('header_sub')}
     </p>
   </div>
 </div>
@@ -29,13 +28,13 @@ const Header = () => {
   {/* Right side circle */}
 
   <div className="w-full md:w-1/2 flex justify-center mt-20">
-    <div className="relative grid border-[12px] aspect-square text-[#285ca8] rounded-full 
+    <div className="relative grid border-[12px] aspect-square text-[#2a3b1f] rounded-full 
                     w-[260px] h-[260px] sm:w-[320px] sm:h-[320px] md:w-[340px] md:h-[340px]
-                    bg-gradient-to-br from-[#051732] to-[#0a2345] shadow-xl">
+                    bg-gradient-to-br from-[#ffedd5] to-[#fde68a] shadow-xl">
       
       <h3 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
                      text-center text-white font-semibold text-lg sm:text-xl">
-        Smarter Farming,<br/>Better Future 🌱
+        बेहतर खेती,<br/>उज्ज्वल भविष्य 🌾
 
       </h3>
 

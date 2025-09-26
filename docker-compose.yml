@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: sih_mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+      - MONGO_INITDB_DATABASE=sih_internal
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - sih_network
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: sih_backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/sih_internal?authSource=admin
+      - JWT_SECRET=your_super_secret_jwt_key_change_in_production
+      - CLIENT_URL=http://localhost:3000
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+    networks:
+      - sih_network
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+
+  # AI Server
+  ai-server:
+    build:
+      context: ./ai_server
+      dockerfile: Dockerfile
+    container_name: sih_ai_server
+    restart: unless-stopped
+    environment:
+      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/sih_internal?authSource=admin
+      - CLIENT_ORIGIN=http://localhost:5173
+      - AI_SERVER_PORT=8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb
+    networks:
+      - sih_network
+    volumes:
+      - ./ai_server:/app
+      - /app/__pycache__
+
+  # Frontend (React)
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: sih_frontend
+    restart: unless-stopped
+    environment:
+      - VITE_BACKEND_URL=http://localhost:3000
+      - VITE_AI_URL=http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+      - ai-server
+    networks:
+      - sih_network
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+
+volumes:
+  mongodb_data:
+
+networks:
+  sih_network:
+    driver: bridge
+

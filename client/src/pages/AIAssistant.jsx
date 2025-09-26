@@ -1,25 +1,59 @@
-import React, { useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
+import { AppContext } from "../context/AppContext";
 
 const ChatApp = () => {
+  const { backend_url } = useContext(AppContext)
   const [messages, setMessages] = useState([
     { id: 1, sender: "bot", text: "👋 Hi there! How can I assist you today?" },
   ]);
   const [input, setInput] = useState("");
+  const [sessionId, setSessionId] = useState(() => localStorage.getItem('ai_session') || "");
+  const aiUrl = import.meta.env.VITE_AI_URL || "http://localhost:8000";
+  const listRef = useRef(null)
 
-  const handleSend = () => {
+  useEffect(()=>{
+    if (sessionId) {
+      fetch(`${aiUrl}/api/ai/history/${sessionId}`)
+        .then(r=>r.json())
+        .then(data=>{
+          if (data?.success && Array.isArray(data.messages)) {
+            const mapped = data.messages.map((m, i)=>({ id: i+2, sender: m.role==='assistant'?'bot':'user', text: m.content }))
+            setMessages(prev => [prev[0], ...mapped])
+          }
+        }).catch(()=>{})
+    }
+  },[sessionId])
+
+  useEffect(()=>{
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight
+    }
+  },[messages])
+
+  const handleSend = async () => {
     if (!input.trim()) return;
-
-    const newMessage = { id: Date.now(), sender: "user", text: input };
-    setMessages([...messages, newMessage]);
+    const userMsg = { id: Date.now(), sender: "user", text: input };
+    const text = input
+    setMessages(prev => [...prev, userMsg]);
     setInput("");
-
-    // Placeholder bot reply
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now() + 1, sender: "bot", text: "🤖 This is a sample reply." },
-      ]);
-    }, 800);
+    try {
+      const res = await fetch(`${aiUrl}/api/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId || undefined, message: text })
+      })
+      const data = await res.json()
+      if (data?.success) {
+        if (!sessionId && data.sessionId) {
+          setSessionId(data.sessionId)
+          localStorage.setItem('ai_session', data.sessionId)
+        }
+        const botMsg = { id: Date.now()+1, sender: 'bot', text: data.reply }
+        setMessages(prev => [...prev, botMsg])
+      }
+    } catch (e) {
+      setMessages(prev => [...prev, { id: Date.now()+2, sender: 'bot', text: 'Sorry, the AI service is unavailable right now.' }])
+    }
   };
 
   return (
@@ -33,7 +67,7 @@ const ChatApp = () => {
       <div className="flex-1 flex justify-center items-center p-6">
         <div className="w-full max-w-md h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
           {/* Chat Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
             {messages.map((msg) => (
               <div
                 key={msg.id}

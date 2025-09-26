@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+/* High-contrast helper */
+.contrast {
+  filter: contrast(1.1) saturate(1.1);
+}
